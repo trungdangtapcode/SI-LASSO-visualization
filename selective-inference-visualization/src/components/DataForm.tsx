@@ -1,18 +1,8 @@
 import React from 'react';
 
 interface DataFormProps {
-  params: {
-    n: number;
-    beta1: number;
-    beta2: number;
-    sigma: number;
-  };
-  setParams: (params: {
-    n?: number;
-    beta1?: number;
-    beta2?: number;
-    sigma?: number;
-  }) => void;
+  params: { n: number; beta1: number; beta2: number; sigma: number };
+  setParams: (params: { n: number; beta1: number; beta2: number; sigma: number }) => void;
   onGenerate: () => void;
 }
 
