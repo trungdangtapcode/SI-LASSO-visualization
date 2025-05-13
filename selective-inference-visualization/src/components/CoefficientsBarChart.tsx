@@ -12,13 +12,28 @@ interface CoefficientsBarChartProps {
 
 const CoefficientsBarChart: React.FC<CoefficientsBarChartProps> = ({ path, lambdaIdx, X, y }) => {
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!path || path.length === 0) {
+      setError('No data available to plot.');
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
+    setError(null);
+
     const b_lasso = [path[lambdaIdx].beta1, path[lambdaIdx].beta2];
     const { selectiveCI, naiveCI, S } = computeCIs(X, y, b_lasso, lambdaIdx, path);
+
     if (S.length === 0) {
-      Plotly.newPlot('barChart', [], { title: 'No Features Selected' }).then(() => setIsLoading(false));
+      Plotly.newPlot('barChart', [], { title: 'No Features Selected' })
+        .then(() => setIsLoading(false))
+        .catch(() => {
+          setError('Failed to render the plot.');
+          setIsLoading(false);
+        });
       return;
     }
 
@@ -51,13 +66,20 @@ const CoefficientsBarChart: React.FC<CoefficientsBarChartProps> = ({ path, lambd
         },
       },
     ];
-    Plotly.newPlot('barChart', data, { title: 'Coefficients and CIs', yaxis: { title: 'Value' } }).then(() => setIsLoading(false));
+
+    Plotly.newPlot('barChart', data, { title: 'Coefficients and CIs', yaxis: { title: 'Value' } })
+      .then(() => setIsLoading(false))
+      .catch(() => {
+        setError('Failed to render the plot.');
+        setIsLoading(false);
+      });
   }, [path, lambdaIdx, X, y]);
 
   return (
     <div className="w-full h-96">
       {isLoading && <div className="loading-spinner">Loading...</div>}
-      <div id="barChart" style={{ display: isLoading ? 'none' : 'block' }}></div>
+      {error && <div className="error-message">{error}</div>}
+      <div id="barChart" style={{ display: isLoading || error ? 'none' : 'block' }}></div>
     </div>
   );
 };

@@ -50,8 +50,11 @@ export function computeLassoPath(
   lambdaGrid: number[]
 ): LassoPathEntry[] {
   const n = X.rows;
+  const m = X.columns;
   const path: LassoPathEntry[] = [];
   let beta: number[] = [0, 0];
+
+  // console.log('X:', X.toString());
 
   for (const lambda of lambdaGrid) {
     let betaNew = [...beta];
@@ -62,13 +65,19 @@ export function computeLassoPath(
     while (!converged && iter < maxIter) {
       const betaOld = [...betaNew];
       for (let j = 0; j < 2; j++) {
-        const Xj = new Matrix(X.getColumn(j).map((value) => [value]));
-        const residual = y.sub(X.mmul(Matrix.columnVector(betaNew))).add(
-          Xj.mul(-betaNew[j])
-        );
-        const rho =
-          Xj.transpose().mmul(residual).get(0, 0) / n;
-        const z = (Xj.norm('frobenius') ** 2) / n;
+        const Xj = new Matrix(X.getColumn(j).map((value) => [value])); // Column vector n×1
+        const Xbeta = X.mmul(Matrix.columnVector(betaNew));           // n×1
+        const XjBeta = Xj.clone().mul(betaNew[j]);                     // n×1
+        const residual = y.clone().sub(Xbeta).add(XjBeta);             // n×1
+
+        const rho = Xj.transpose().mmul(residual).get(0, 0) / n;       // scalar
+        const z = (Xj.transpose().mmul(Xj).get(0, 0)) / n;              // scalar, same as (Xj.norm('frobenius')**2) / n
+
+        if (z !== 0) {
+          betaNew[j] = softThreshold(rho, lambda / n) / z;
+        } else {
+          betaNew[j] = 0; // Avoid division by zero
+        }
         betaNew[j] = softThreshold(rho, lambda / n) / z;
       }
       converged =
