@@ -9,13 +9,13 @@ import '../App.css';
 import type { GeneratedData } from '@/types/GeneratedData';
 
 const InteractivePage = () => {
-  const [params, setParams] = useState({ n: 10, beta1: 1, beta2: 1, sigma: 1 });
-  const [data, setData] = useState<GeneratedData|null>(null);
+  const [params, setParams] = useState({ n: 10, m: 2, betas: [1, 1], sigma: 1 });
+  const [data, setData] = useState<GeneratedData | null>(null);
   const [path, setPath] = useState<LassoPathEntry[]>([]);
   const [lambdaIdx, setLambdaIdx] = useState(0);
 
   const handleGenerate = () => {
-    const newData = generateData(params.n, params.beta1, params.beta2, params.sigma);
+    const newData = generateData(params.n, params.m, params.betas, params.sigma);
     setData(newData);
     const lambdaMax = Math.max(...newData.X.transpose().mmul(newData.y).abs().to1DArray());
     const lambdaGrid = Array.from({ length: 100 }, (_, i) => lambdaMax * (1 - i / 99));

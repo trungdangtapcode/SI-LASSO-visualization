@@ -1,13 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState } from 'react';
 import Plotly from 'plotly.js-dist';
-import { computeCIs } from '../utils/lassoUtils';
+import { computeCIs } from '@/utils/lassoUtils';
 
+// Assuming computeCIs is typed elsewhere; using any for X, y, and computeCIs for now
 interface CoefficientsBarChartProps {
-  path: any;
+  path: { lambda: number; betas: number[] }[];
   lambdaIdx: number;
-  X: any;
-  y: any;
+  X: any; // Replace with proper type if available
+  y: any; // Replace with proper type if available
 }
 
 const CoefficientsBarChart: React.FC<CoefficientsBarChartProps> = ({ path, lambdaIdx, X, y }) => {
@@ -15,7 +16,7 @@ const CoefficientsBarChart: React.FC<CoefficientsBarChartProps> = ({ path, lambd
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!path || path.length === 0) {
+    if (!path || path.length === 0 || !path[0]?.betas) {
       setError('No data available to plot.');
       setIsLoading(false);
       return;
@@ -24,7 +25,7 @@ const CoefficientsBarChart: React.FC<CoefficientsBarChartProps> = ({ path, lambd
     setIsLoading(true);
     setError(null);
 
-    const b_lasso = [path[lambdaIdx].beta1, path[lambdaIdx].beta2];
+    const b_lasso = path[lambdaIdx].betas;
     const { selectiveCI, naiveCI, S } = computeCIs(X, y, b_lasso, lambdaIdx, path);
 
     if (S.length === 0) {
@@ -36,6 +37,10 @@ const CoefficientsBarChart: React.FC<CoefficientsBarChartProps> = ({ path, lambd
         });
       return;
     }
+
+    console.log('Selected Features:', S);
+    console.log('Naive CI:', naiveCI);
+    console.log('Selective CI:', selectiveCI);
 
     const data = [
       {

@@ -4,22 +4,22 @@ interface Preset {
   name: string;
   params: {
     n: number;
-    beta1: number;
-    beta2: number;
+    m: number;
+    betas: number[];
     sigma: number;
   };
 }
 
 interface PresetButtonsProps {
-  setParams: (params: { n: number; beta1: number; beta2: number; sigma: number }) => void;
+  setParams: (params: { n: number; m: number; betas: number[]; sigma: number }) => void;
   onGenerate: () => void;
 }
 
 const PresetButtons: React.FC<PresetButtonsProps> = ({ setParams, onGenerate }) => {
   const presets: Preset[] = [
-    { name: 'Both Significant', params: { n: 100, beta1: 1, beta2: 1, sigma: 1 } },
-    { name: 'One Zero', params: { n: 100, beta1: 1, beta2: 0, sigma: 1 } },
-    { name: 'Weak Signals', params: { n: 100, beta1: 0.2, beta2: 0.3, sigma: 1 } },
+    { name: 'All Significant', params: { n: 100, m: 2, betas: [1, 1], sigma: 1 } },
+    { name: 'One Zero', params: { n: 100, m: 2, betas: [1, 0], sigma: 1 } },
+    { name: 'Weak Signals', params: { n: 100, m: 2, betas: [0.2, 0.3], sigma: 1 } },
   ];
 
   return (

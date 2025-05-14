@@ -1,15 +1,13 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable prefer-const */
 import { inverse, Matrix } from 'ml-matrix';
-import { normalMatrix }  from './randomNormal';
+import { normalMatrix } from './randomNormal';
 import { selectColumns } from './extendsFunc';
 import type { GeneratedData } from '@/types/GeneratedData';
-// @ts-nocheck
 
 export interface LassoPathEntry {
   lambda: number;
-  beta1: number;
-  beta2: number;
+  betas: number[];
 }
 
 export interface ConfidenceInterval {
@@ -26,15 +24,23 @@ export interface ComputeCIsResult {
 // Generate synthetic data
 export function generateData(
   n: number,
-  beta1: number,
-  beta2: number,
+  m: number,
+  betaValues: number[],
   sigma: number
 ): GeneratedData {
-  // const X = Matrix.randn(n, 2);
-  const X = normalMatrix(n, 2, 0, 1); // Use normalMatrix to generate X
-  // const epsilon = Matrix.randn(n, 1).mul(sigma);
-  const epsilon = normalMatrix(n, 1, 0, sigma); // Use normalMatrix to generate epsilon
-  const y = X.mmul(Matrix.columnVector([beta1, beta2])).add(epsilon);
+  // Generate X with n samples and m features
+  const X = normalMatrix(n, m, 0, 1);
+  // Initialize beta coefficients
+  const beta = Array(m).fill(0);
+  // Assign beta1 to the first feature
+  // Assign beta2 to the second feature
+  betaValues.forEach((val, i) => {
+    if (i < m) beta[i] = val; // Assign provided beta values
+  });
+  // Generate noise
+  const epsilon = normalMatrix(n, 1, 0, sigma);
+  // Compute y
+  const y = X.mmul(Matrix.columnVector(beta)).add(epsilon);
   return { X, y };
 }
 
@@ -52,9 +58,8 @@ export function computeLassoPath(
   const n = X.rows;
   const m = X.columns;
   const path: LassoPathEntry[] = [];
-  let beta: number[] = [0, 0];
-
-  // console.log('X:', X.toString());
+  // Initialize beta coefficients for m features
+  let beta: number[] = Array(m).fill(0);
 
   for (const lambda of lambdaGrid) {
     let betaNew = [...beta];
@@ -64,21 +69,24 @@ export function computeLassoPath(
 
     while (!converged && iter < maxIter) {
       const betaOld = [...betaNew];
-      for (let j = 0; j < 2; j++) {
-        const Xj = new Matrix(X.getColumn(j).map((value) => [value])); // Column vector n×1
-        const Xbeta = X.mmul(Matrix.columnVector(betaNew));           // n×1
-        const XjBeta = Xj.clone().mul(betaNew[j]);                     // n×1
-        const residual = y.clone().sub(Xbeta).add(XjBeta);             // n×1
+      for (let j = 0; j < m; j++) {
+        // Column vector n×1
+        const Xj = new Matrix(X.getColumn(j).map((value) => [value]));
+        // n×1
+        const Xbeta = X.mmul(Matrix.columnVector(betaNew));
+        // n×1
+        const XjBeta = Xj.clone().mul(betaNew[j]);
+        // n×1
+        const residual = y.clone().sub(Xbeta).add(XjBeta);
 
-        const rho = Xj.transpose().mmul(residual).get(0, 0) / n;       // scalar
-        const z = (Xj.transpose().mmul(Xj).get(0, 0)) / n;              // scalar, same as (Xj.norm('frobenius')**2) / n
+        // scalar
+        const rho = Xj.transpose().mmul(residual).get(0, 0) / n;
+        // scalar
+        const z = Xj.transpose().mmul(Xj).get(0, 0) / n;
 
         if (z !== 0) {
           betaNew[j] = softThreshold(rho, lambda / n) / z;
-        } else {
-          betaNew[j] = 0; // Avoid division by zero
         }
-        betaNew[j] = softThreshold(rho, lambda / n) / z;
       }
       converged =
         Math.max(...betaNew.map((b, i) => Math.abs(b - betaOld[i]))) < 1e-5;
@@ -86,7 +94,8 @@ export function computeLassoPath(
     }
 
     beta = betaNew;
-    path.push({ lambda, beta1: beta[0], beta2: beta[1] });
+    // Store beta for all m features
+    path.push({ lambda, betas: [...beta] });
   }
 
   return path;
@@ -101,7 +110,7 @@ export function computeCIs(
   path: LassoPathEntry[]
 ): ComputeCIsResult {
   const n = X.rows;
-  const p = 2;
+  const m = X.columns;
   const S: number[] = b_lasso
     .map((b, i) => (b !== 0 ? i : -1))
     .filter((i) => i >= 0);
@@ -110,7 +119,7 @@ export function computeCIs(
   const M = inverse(XtX);
   const b_ols_full = M.mmul(X.transpose().mmul(y)).div(n).to1DArray();
   const residuals = y.sub(X.mmul(Matrix.columnVector(b_ols_full)));
-  const sigma2_ols = (residuals.norm('frobenius') ** 2) / (n - p);
+  const sigma2_ols = (residuals.norm('frobenius') ** 2) / (n - m);
   const se = M.diag().map((d) => Math.sqrt((sigma2_ols * d) / n));
 
   const selectiveCI: ConfidenceInterval[] = S.map((j) => ({
@@ -120,15 +129,13 @@ export function computeCIs(
 
   let naiveCI: ConfidenceInterval[] = [];
   if (S.length > 0) {
-    // const X_S = X.columnSelection(S);
     const X_S = selectColumns(X, S);
     const XtX_S = X_S.transpose().mmul(X_S);
-    const b_ols_S = inverse(XtX_S).mmul(X_S.transpose().mmul(y)).to1DArray();
+    const M_S = inverse(XtX_S);
+    const b_ols_S = M_S.mmul(X_S.transpose().mmul(y)).to1DArray();
     const residuals_S = y.sub(X_S.mmul(Matrix.columnVector(b_ols_S)));
     const sigma2_S = (residuals_S.norm('frobenius') ** 2) / (n - S.length);
-    const se_S = inverse(XtX_S)
-      .diag()
-      .map((d: number) => Math.sqrt(sigma2_S * d));
+    const se_S = M_S.diag().map((d: number) => Math.sqrt(sigma2_S * d));
 
     naiveCI = S.map((j, idx) => ({
       lower: b_ols_S[idx] - 1.96 * se_S[idx],

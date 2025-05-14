@@ -1,8 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import Plotly from 'plotly.js-dist';
 
+// Define a custom type for Plotly traces to include mode and line
+type PlotlyTrace = {
+  x: number[];
+  y: number[];
+  name: string;
+  type: string;
+  mode?: string;
+  line?: { dash?: string };
+};
+
 interface SolutionPathPlotProps {
-  path: { lambda: number, beta1: number, beta2: number }[];
+  path: { lambda: number; betas: number[] }[];
   lambdaIdx: number;
 }
 
@@ -11,7 +21,7 @@ const SolutionPathPlot: React.FC<SolutionPathPlotProps> = ({ path, lambdaIdx }) 
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!path || path.length === 0) {
+    if (!path || path.length === 0 || !path[0]?.betas) {
       setError('No data available to plot.');
       setIsLoading(false);
       return;
@@ -20,17 +30,23 @@ const SolutionPathPlot: React.FC<SolutionPathPlotProps> = ({ path, lambdaIdx }) 
     setIsLoading(true);
     setError(null);
 
-    const data = [
-      { x: path.map((p) => p.lambda), y: path.map((p) => p.beta1), name: 'Beta1', type: 'scatter' },
-      { x: path.map((p) => p.lambda), y: path.map((p) => p.beta2), name: 'Beta2', type: 'scatter' },
-      {
-        x: [path[lambdaIdx].lambda, path[lambdaIdx].lambda],
-        y: [-2, 2],
-        mode: 'lines',
-        name: 'Selected Lambda',
-        line: { dash: 'dash' },
-      },
-    ];
+    // Dynamically create traces for each beta coefficient
+    const data: PlotlyTrace[] = path[0].betas.map((_, index) => ({
+      x: path.map((p) => p.lambda),
+      y: path.map((p) => p.betas[index]),
+      name: `Beta${index + 1}`,
+      type: 'scatter',
+    }));
+
+    // Add trace for selected lambda
+    data.push({
+      x: [path[lambdaIdx].lambda, path[lambdaIdx].lambda],
+      y: [-2, 2], // Fixed range for visualization
+      mode: 'lines',
+      name: 'Selected Lambda',
+      type: 'scatter',
+      line: { dash: 'dash' },
+    });
 
     Plotly.newPlot('solutionPlot', data, {
       title: 'LASSO Solution Path',
